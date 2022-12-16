@@ -3,6 +3,7 @@ package lexer
 import "lexer-parser/token"
 
 // A Lexer
+// just in time parse the input content to a series of tokens
 type Lexer struct {
 	input        string // parser content
 	position     int    // current position in input (points to current char)
@@ -86,6 +87,14 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.LBRACE, l.ch)
 	case '}':
 		tok = newToken(token.RBRACE, l.ch)
+	case '"':
+		tok.Type = token.STRING
+		tok.Literal = l.readString()
+	case  '[':
+		tok = newToken(token.LBRACKET, l.ch)
+	case  ']':
+		tok = newToken(token.RBRACKET, l.ch)
+
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
@@ -155,4 +164,15 @@ func isLetter(ch byte) bool {
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
+func (l *Lexer) readString() string {
+	position := l.position + 1
+	for {
+		l.readChar()
+		if l.ch == '"' || l.ch == 0 {
+			break
+		}
+	}
+	return l.input[position:l.position]
 }

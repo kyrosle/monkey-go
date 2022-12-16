@@ -14,15 +14,17 @@ func TestNextToken(t *testing.T) {
 		};
 		let result = add(five, ten);
 		!-/*5;
-		5 < 10 > 5; 
+		5 < 10 > 5;
 		if (5 < 10) {
 			return true;
 		} else {
 			return false;
 		}
-
 		10 == 10;
 		10 != 9;
+		"foobar"
+		"foo bar"
+		[1, 2];
 	`
 
 	tests := []struct {
@@ -94,6 +96,24 @@ func TestNextToken(t *testing.T) {
 		{token.FALSE, "false"},
 		{token.SEMICOLON, ";"},
 		{token.RBRACE, "}"},
+		{token.INT, "10"},
+		{token.EQ, "=="},
+		{token.INT, "10"},
+		{token.SEMICOLON, ";"},
+		{token.INT, "10"},
+		{token.NOT_EQ, "!="},
+		{token.INT, "9"},
+		{token.SEMICOLON, ";"},
+		{token.STRING, "foobar"},
+		{token.STRING, "foo bar"},
+		{token.EOF, ""},
+		{token.LBRACKET, "["},
+		{token.INT, "1"},
+		{token.COMMA, ","},
+		{token.INT, "2"},
+		{token.RBRACKET, "]"},
+		{token.SEMICOLON, ";"},
+		{token.EOF, ""},
 	}
 	l := New(input)
 
@@ -101,7 +121,7 @@ func TestNextToken(t *testing.T) {
 		tok := l.NextToken()
 
 		if tok.Type != tt.expectedType {
-			t.Fatalf("test[%d] - tokentype wrong. expected=%q, got=%q", i, tt.expectedType, tok.Type)
+			t.Fatalf("test[%d] - tokenType wrong. expected=%q, got=%q, literal=%q", i, tt.expectedType, tok.Type, tok.Literal)
 		}
 
 		if tok.Literal != tt.expectedLiteral {

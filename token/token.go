@@ -44,6 +44,11 @@ const (
 	IF       = "IF"
 	ELSE     = "ELSE"
 	RETURN   = "RETURN"
+
+	STRING = "STRING"
+
+	LBRACKET = "["
+	RBRACKET = "]"
 )
 
 // Identifiers apart from language keywords

@@ -14,7 +14,18 @@ const PROMPT = ">> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
-	env:= object.NewEnvironment()
+	env := object.NewEnvironment()
+
+	builtinFns := `
+let map = fn(arr, f) { let iter = fn(arr, accumulated) { if (len(arr) == 0) { accumulated } else { iter(rest(arr), push(accumulated, f(first(arr)))); } }; iter(arr, []); };
+let reduce = fn(arr, initial, f) { let iter = fn(arr, result) { if (len(arr) == 0) { result } else { iter(rest(arr), f(result, first(arr))); } }; iter(arr, initial); };
+let sum = fn(arr) { reduce(arr, 0, fn(initial, el) { initial + el }); };
+	`
+
+	l := lexer.New(builtinFns)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	evaluator.Eval(program, env)
 
 	for {
 		fmt.Fprint(out, PROMPT)
@@ -24,10 +35,10 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		line := scanner.Text()
-		l := lexer.New(line)
-		p := parser.New(l)
+		l = lexer.New(line)
+		p = parser.New(l)
 
-		program := p.ParseProgram()
+		program = p.ParseProgram()
 
 		if len(p.Errors()) != 0 {
 			printParserErrors(out, p.Errors())

@@ -49,6 +49,8 @@ const (
 
 	LBRACKET = "["
 	RBRACKET = "]"
+
+	COLON = ":"
 )
 
 // Identifiers apart from language keywords

@@ -117,6 +117,8 @@ func New(l *lexer.Lexer) *Parser {
 	// <[> <literal> ]
 	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 
+	p.registerPrefix(token.LBRACE, p.parseHashLiteral)
+
 	// Every infix operator gets associated with the same parsing function called parseInfixExpression
 	// a set of parsers for <expression> <infix operator> <expression>
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
@@ -586,6 +588,42 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	}
 
 	return exp
+}
+
+func (p *Parser) parseHashLiteral() ast.Expression {
+	// initialize hash literal
+	hash := &ast.HashLiteral{Token: p.curToken}
+
+	// initialize hash.Pairs which contain the [ast.Expression]:[ast.Expression]
+	hash.Pairs = make(map[ast.Expression]ast.Expression)
+
+	// until meet next token is "{"
+	for !p.peekTokenIs(token.RBRACE) {
+		// skip "{"
+		p.nextToken()
+		// parse the key expression
+		key := p.parseExpression(LOWEST)
+		// if the next token isn't ":"
+		if !p.expectPeek(token.COLON) {
+			return nil
+		}
+		// skip ":"
+		p.nextToken()
+
+		// parse the value expression
+		value := p.parseExpression(LOWEST)
+		// add the key-value to hash.Pairs
+		hash.Pairs[key] = value
+		// if next token isn't "}" and  next token also isn't ","
+		if !p.peekTokenIs(token.RBRACE) && !p.expectPeek(token.COMMA) {
+			return nil
+		}
+	}
+	// the parser end at the token "}"
+	if !p.expectPeek(token.RBRACE) {
+		return nil
+	}
+	return hash
 }
 
 // Error handle for no prefix error

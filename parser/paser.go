@@ -95,28 +95,22 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	// <-> <expression>
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
-
 	// <true>
 	p.registerPrefix(token.TRUE, p.parseBoolean)
 	// <false>
 	p.registerPrefix(token.FALSE, p.parseBoolean)
-
 	// <(> <expression> )
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
-
 	// <if> ( <condition> ) { <consequence> } [else { alternative }]
 	// not <else if>
 	p.registerPrefix(token.IF, p.parseIfExpression)
-
 	// <fn>
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
-
 	// <"> <literal> "
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
-
 	// <[> <literal> ]
 	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
-
+	// <{> <literal> }
 	p.registerPrefix(token.LBRACE, p.parseHashLiteral)
 
 	// Every infix operator gets associated with the same parsing function called parseInfixExpression
@@ -140,7 +134,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.GT, p.parseInfixExpression)
 	// <expression> ( <expression> )
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
-
+	// <[> <integer literal> ]
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
@@ -182,20 +176,20 @@ func (p *Parser) nextToken() {
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
+
 	// It then iterates over every token in the input until it encounters an token.EOF token.
 	for p.curToken.Type != token.EOF {
 		// parse a statement
 		stmt := p.parseStatement()
-
-		// if stmt != nil {
+		// append to the series of statements
 		program.Statements = append(program.Statements, stmt)
-		// }
-
+		// forward token
 		p.nextToken()
 	}
 	return program
 }
 
+// parse the statement with cases : "let", "return", other expression statement
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
@@ -253,7 +247,9 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	// parse the next expression to self Value
 	stmt.ReturnValue = p.parseExpression(LOWEST)
 
+	// check the current token whether is ";"
 	for !p.curTokenIs(token.SEMICOLON) {
+		// skip the ";"
 		p.nextToken()
 	}
 
@@ -268,7 +264,9 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	// parse the expression to self Expression
 	stmt.Expression = p.parseExpression(LOWEST)
 
+	// check the current token whether is ";"
 	if p.peekTokenIs(token.SEMICOLON) {
+		// skip the ";"
 		p.nextToken()
 	}
 
@@ -286,10 +284,13 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	// skip "{"
 	p.nextToken()
 
-	// check
+	// check current token whether is "}" and not "" EOF
 	for !p.curTokenIs(token.RBRACE) && !p.curTokenIs(token.EOF) {
+		// the statement in the block statement maybe be "let..", "return..", or other expression statement
 		stmt := p.parseStatement()
+		// append it to the series of block statements
 		block.Statements = append(block.Statements, stmt)
+		// skip current token
 		p.nextToken()
 	}
 	return block
@@ -383,14 +384,17 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	// take out the prefix parse fn from prefixParseFns mapper
 	prefix := p.prefixParseFns[p.curToken.Type]
+	// if current token don't have prefix parse fn push a Parsing error
 	if prefix == nil {
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
+	// execute the prefix parse fn, and get the left expression
 	leftExp := prefix()
 
 	// And it does all this again and
 	// again until it encounters a token that has a lower precedence.
+	// or meet the next token is ";"
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
 		// take out the infix parse fn from prefixParseFns mapper
 		infix := p.infixParseFns[p.peekToken.Type]
@@ -407,6 +411,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 
 // parse Prefix
 // <prefix operator><expression>;
+// for "! <expression>" and "- <expression>"
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	// initialize prefix expression
 	expression := &ast.PrefixExpression{
@@ -426,6 +431,7 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 // parse Infix expression
 // (Left)<expression> (Operator)<infix operator> (Right)<expression>
 // left is the pre Expression
+// for +, -, /, *, ==, !=, <, >
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// initialize infix expression
 	expression := &ast.InfixExpression{
@@ -445,6 +451,7 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 }
 
 // parse e.g. input : (5 + 5) * 2;
+// for <(> <expression> )
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	// skip "("
 	p.nextToken()
@@ -530,10 +537,15 @@ func (p *Parser) parseBoolean() ast.Expression {
 	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
 
+// parse string literal
+// for " literal
 func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }
 
+// parse Array literal
+// <[> <literal> ]
+// for [
 func (p *Parser) parseArrayLiteral() ast.Expression {
 	array := &ast.ArrayLiteral{Token: p.curToken}
 
@@ -543,7 +555,7 @@ func (p *Parser) parseArrayLiteral() ast.Expression {
 }
 
 // parse the a series of argument
-// (Arguments[])<expression>*
+// Arguments[] (end)<tokenType>
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	// initialize the args expression[]
 	list := []ast.Expression{}
@@ -563,6 +575,7 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 
 	// check whether next token is ","
 	for p.peekTokenIs(token.COMMA) {
+		// skip "," and the current token is an array element
 		p.nextToken()
 		p.nextToken()
 
@@ -577,12 +590,18 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	return list
 }
 
+// parse index expression
+// <[> <integer literal> ]
+// for [
+// left is the array name expression
 func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
 
 	p.nextToken()
+	// parse a end is integer expression or else will throw error in the evaluate stage
 	exp.Index = p.parseExpression(LOWEST)
 
+	// check next token whether is "]"
 	if !p.expectPeek(token.RBRACKET) {
 		return nil
 	}
@@ -590,6 +609,7 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	return exp
 }
 
+// a map(hashmap) literal parser
 func (p *Parser) parseHashLiteral() ast.Expression {
 	// initialize hash literal
 	hash := &ast.HashLiteral{Token: p.curToken}

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	r := gin.Default()
-	r.GET("/code", func(c *gin.Context) {
+	r.POST("/code", func(c *gin.Context) {
 		buf := make([]byte, 1024)
 		n, _ := c.Request.Body.Read(buf)
 		c.Request.Body = ioutil.NopCloser(bytes.NewReader(buf[:n]))

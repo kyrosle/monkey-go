@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"lexer-parser/repl"
@@ -14,6 +15,10 @@ import (
 func main() {
 	r := gin.Default()
 	r.POST("/code", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Microsecond * 900))
+		defer cancel()
+		timer := time.NewTimer(time.Duration(time.Microsecond * 2000))
+
 		buf := make([]byte, 1024)
 		n, _ := c.Request.Body.Read(buf)
 		c.Request.Body = ioutil.NopCloser(bytes.NewReader(buf[:n]))
@@ -21,23 +26,30 @@ func main() {
 		fmt.Println("body: ", raw_code)
 
 		channel := make(chan string, 1)
-		wait_channel := make(chan bool, 1)
+		check := make(chan bool, 1)
 
-		go func() {
-			channel <- repl.StartHandle(raw_code)
-			wait_channel <- true
-		}()
+		go func(ctx context.Context) {
+			res, ok := repl.StartHandle(raw_code)
+			channel <- res
+			check <- ok
+		}(ctx)
 
 		select {
-		case <-wait_channel:
+		case <-ctx.Done():
 			ret := <-channel
 			fmt.Println("Response: ", ret)
-			c.JSON(http.StatusOK, ret)
-		case <- time.After(time.Duration(5) * time.Second):
+			check_ok := <-check
+			if check_ok {
+				c.JSON(http.StatusOK, ret)
+			} else {
+				c.JSON(http.StatusNotAcceptable, ret)
+			}
+			return
+		case <-timer.C:
 			fmt.Println("Handle Timeout")
-			c.JSON(http.StatusLocked, "")
+			c.JSON(http.StatusNotAcceptable, "Program RunTimeout")
+			return
 		}
-
 	})
 	r.Run(":8888")
 }

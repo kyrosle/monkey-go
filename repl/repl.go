@@ -54,7 +54,7 @@ func Start(in io.Reader, out io.Writer) {
 	}
 }
 
-func StartHandle(raw string) string {
+func StartHandle(raw string) (string, bool) {
 	l := lexer.New(builtinFns)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -67,10 +67,12 @@ func StartHandle(raw string) string {
 	buf := new(strings.Builder)
 	buf.Grow(len(raw))
 
+	check := true
+
 	for {
 		scanned := scanner.Scan()
 		if !scanned {
-			return buf.String()
+			return buf.String(), check
 		}
 		line := scanner.Text()
 		l = lexer.New(line)
@@ -80,6 +82,7 @@ func StartHandle(raw string) string {
 
 		if len(p.Errors()) != 0 {
 			printParserErrors(buf, p.Errors())
+			check = false
 			continue
 		}
 
